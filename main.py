@@ -32,6 +32,15 @@ def evaluation(board):
             x = x
         evaluation = evaluation + (getPieceValue(str(board.piece_at(i))) if x else -getPieceValue(str(board.piece_at(i))))
         i += 1
+
+    if board.is_game_over():
+        if board.outcome().winner == chess.WHITE:
+            evaluation += 10000
+        elif board.outcome().winner == chess.BLACK:
+            evaluation -= 10000
+        else:
+            evaluation = 0
+
     return evaluation
 
 def minimax(depth, board, alpha, beta, isMaximizing):
@@ -41,7 +50,7 @@ def minimax(depth, board, alpha, beta, isMaximizing):
     possibleMoves = board.legal_moves
 
     if (isMaximizing):
-        bestMove = -9999
+        bestMove = -float("inf")
         for m in possibleMoves:
             move = chess.Move.from_uci(str(m))
             board.push(move)
@@ -52,7 +61,7 @@ def minimax(depth, board, alpha, beta, isMaximizing):
                 return bestMove
         return bestMove
     else:
-        bestMove = 9999
+        bestMove = float("inf")
         for m in possibleMoves:
             move = chess.Move.from_uci(str(m))
             board.push(move)
@@ -65,47 +74,61 @@ def minimax(depth, board, alpha, beta, isMaximizing):
 
 def minimaxRoot(depth, board, isMaximizing):
     possibleMoves = board.legal_moves
-    bestMove = -9999
+
+    bestMove = float('-inf')
     bestMoveFinal = None
     
     for m in possibleMoves:
         move = chess.Move.from_uci(str(m))
         board.push(move)
-        value = max(bestMove, minimax(depth - 1, board, -10000, 10000, not isMaximizing))
+        value = max(bestMove, minimax(depth - 1, board, -float("inf"), float("inf"), not isMaximizing))
+        # print("value: ", value)
         # unmake the last move 
         board.pop()
-        if( value > bestMove):
-            print("Best score: " ,str(bestMove))
-            print("Best move: ",str(bestMoveFinal))
+        if (value >= bestMove):
+            # print("Best score: ", str(bestMove))
+            # print("Best move: ", str(bestMoveFinal))
             bestMove = value
             bestMoveFinal = move
 
     return bestMoveFinal
 
 def main():
-    stockfish = Stockfish()
+    stockfish = Stockfish(depth=1, parameters={"Skill Level": 1})
     board = chess.Board()
     n = 0
     print(board)
-    while n < 100:
+    while n < 1000:
+
+        if board.is_game_over():
+            print(board.outcome())
+            return 
 
         if n % 2 == 0:
             # Alpha-Beta Pruning
             print("White's Turn: ")
             move = minimaxRoot(3, board, True)
+            # if move == None:
+            #     print("Game Over")
+            #     return 
             move = chess.Move.from_uci(str(move))
             board.push(move)
             stockfish.make_moves_from_current_position([move])
         else:
             # Stockfish 
-            move = stockfish.get_best_move()
-            print(move)
-            move = chess.Move.from_uci(str(move))
+            print("Black's Turn: ")
+            # move = stockfish.get_best_move()
+            moves = list(board.generate_legal_moves())
+            # if move == None:
+            #     return "Game Over"
+            move = chess.Move.from_uci(str(moves[0]))
             board.push(move)
             stockfish.make_moves_from_current_position([move])
         print(board)
         chess.svg.board(board)
         n += 1
+    print("100 move limit exceeded")
+    return 
 
 if __name__ == "__main__":
     main() 
