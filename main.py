@@ -2,6 +2,105 @@ import chess
 import chess.svg
 from stockfish import Stockfish
 
+def getPieceValueHeuristic(piece, i):
+    if piece == None:
+        return 0
+    
+    pawnValues = [0,  0,  0,  0,  0,  0,  0,  0, 
+                  50, 50, 50, 50, 50, 50, 50, 50, 
+                  10, 10, 20, 30, 30, 20, 10, 10,
+5,  5, 10, 25, 25, 10,  5,  5,
+0,  0,  0, 20, 20,  0,  0,  0,
+5, -5,-10,  0,  0,-10, -5,  5,
+5, 10, 10,-20,-20, 10, 10,  5,
+0,  0,  0,  0,  0,  0,  0,  0]
+    
+    knightValues = [-50, -40, -30, -30, -30, -30, -40, -50,
+-40, -20, 0, 0, 0, 0, -20, -40,
+-30, 0, 10, 15, 15, 10, 0, -30,
+-30, 5, 15, 20, 20, 15, 5, -30,
+-30, 0, 15, 20, 20, 15, 0, -30,
+-30, 5, 10, 15, 15, 10, 5, -30,
+-40, -20, 0, 5, 5, 0, -20, -40,
+-50, -40, -30, -30, -30, -30, -40, -50]
+    
+    bishopValues = [-20, -10, -10, -10, -10, -10, -10, -20,
+-10, 0, 0, 0, 0, 0, 0, -10,
+-10, 0, 5, 10, 10, 5, 0, -10,
+-10, 5, 5, 10, 10, 5, 5, -10,
+-10, 0, 10, 10, 10, 10, 0, -10,
+-10, 10, 10, 10, 10, 10, 10, -10,
+-10, 5, 0, 0, 0, 0, 5, -10,
+-20, -10, -10, -10, -10, -10, -10, -20]
+    
+    rookValues = [0,  0,  0,  0,  0,  0,  0,  0,
+  5, 10, 10, 10, 10, 10, 10,  5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+  0,  0,  0,  5,  5,  0,  0,  0]
+    
+    queenValues = [-20, -10, -10, -5, -5, -10, -10, -20,
+-10, 0, 0, 0, 0, 0, 0, -10,
+-10, 0, 5, 5, 5, 5, 0, -10,
+-5, 0, 5, 5, 5, 5, 0, -5,
+0, 0, 5, 5, 5, 5, 0, -5,
+-10, 5, 5, 5, 5, 5, 0, -10,
+-10, 0, 5, 0, 0, 0, 0, -10,
+-20, -10, -10, -5, -5, -10, -10, -20]
+    
+    kingMiddleValues = [-30, -40, -40, -50, -50, -40, -40, -30,
+-30, -40, -40, -50, -50, -40, -40, -30,
+-30, -40, -40, -50, -50, -40, -40, -30,
+-30, -40, -40, -50, -50, -40, -40, -30,
+-20, -30, -30, -40, -40, -30, -30, -20,
+-10, -20, -20, -20, -20, -20, -20, -10,
+ 20, 20, 0, 0, 0, 0, 20, 20,
+ 20, 30, 10, 0, 0, 10, 30, 20]
+    value = 0
+
+    if piece.casefold() == "p":
+        value = pawnValues[i] + 100
+    elif piece.casefold() == "n":
+        value = knightValues[i] + 320
+    elif piece.casefold() == "b":
+        value = bishopValues[i] + 330
+    elif piece.casefold() == "r":
+        value = rookValues[i] + 500
+    elif piece.casefold() == "q":
+        value = queenValues[i] + 900
+    elif piece.casefold() == "k":
+        value = kingMiddleValues[i] + 20000
+    
+    return value 
+    
+
+def evaluationHeuristic(board):
+    i = 0
+    evaluation = 0
+    x = True
+    
+    while i < 63:
+        try:
+            x = bool(board.piece_at(i).color)
+        except AttributeError as e:
+            x = x
+        evaluation = evaluation + (getPieceValueHeuristic(str(board.piece_at(i)), 63 - i) if x else -getPieceValueHeuristic(str(board.piece_at(i)), i))
+        i += 1
+
+    if board.is_game_over():
+        if board.outcome().winner == chess.WHITE:
+            evaluation += 1000000
+        elif board.outcome().winner == chess.BLACK:
+            evaluation -= 1000000
+        else:
+            evaluation = 0
+    return evaluation
+
+
+
 def getPieceValue(piece):
     if piece == None:
         return 0
@@ -45,12 +144,12 @@ def evaluation(board):
 
 def minimax(depth, board, alpha, beta, isMaximizing):
     if (depth == 0):
-        return evaluation(board) 
+        return evaluationHeuristic(board) 
     
     possibleMoves = board.legal_moves
 
     if (isMaximizing):
-        bestMove = -float("inf")
+        bestMove = float("-inf")
         for m in possibleMoves:
             move = chess.Move.from_uci(str(m))
             board.push(move)
@@ -81,7 +180,7 @@ def minimaxRoot(depth, board, isMaximizing):
     for m in possibleMoves:
         move = chess.Move.from_uci(str(m))
         board.push(move)
-        value = max(bestMove, minimax(depth - 1, board, -float("inf"), float("inf"), not isMaximizing))
+        value = minimax(depth - 1, board, -float("inf"), float("inf"), not isMaximizing)
         # print("value: ", value)
         # unmake the last move 
         board.pop()
@@ -94,7 +193,7 @@ def minimaxRoot(depth, board, isMaximizing):
     return bestMoveFinal
 
 def main():
-    stockfish = Stockfish(depth=1, parameters={"Skill Level": 1})
+    stockfish = Stockfish(depth=3, parameters={"Skill Level": 1})
     board = chess.Board()
     n = 0
     print(board)
@@ -117,11 +216,11 @@ def main():
         else:
             # Stockfish 
             print("Black's Turn: ")
-            # move = stockfish.get_best_move()
-            moves = list(board.generate_legal_moves())
+            move = stockfish.get_best_move()
+            # moves = list(board.generate_legal_moves())
             # if move == None:
             #     return "Game Over"
-            move = chess.Move.from_uci(str(moves[0]))
+            move = chess.Move.from_uci(str(move))
             board.push(move)
             stockfish.make_moves_from_current_position([move])
         print(board)
