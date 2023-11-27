@@ -1,6 +1,7 @@
 import chess
 import chess.svg
 from stockfish import Stockfish
+import math
 
 def getPieceValueHeuristic(piece, i):
     if piece == None:
@@ -171,9 +172,13 @@ def minimax(depth, board, alpha, beta, isMaximizing):
                 return bestMove
         return bestMove
 
-def minimaxRoot(depth, board, isMaximizing):
+def minimaxRoot(board, isMaximizing):
     possibleMoves = board.legal_moves
 
+    pieceDict = board.piece_map()
+    depth = int(15 / math.log(len(pieceDict), 2))
+    # depth = int((3 * math.log(20))/(math.log(possibleMoves.count())))
+    print("depth: ", depth)
     bestMove = float('-inf')
     bestMoveFinal = None
     
@@ -206,7 +211,7 @@ def main():
         if n % 2 == 0:
             # Alpha-Beta Pruning
             print("White's Turn: ")
-            move = minimaxRoot(3, board, True)
+            move = minimaxRoot(board, True)
             # if move == None:
             #     print("Game Over")
             #     return 
