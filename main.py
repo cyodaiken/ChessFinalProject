@@ -1,7 +1,10 @@
 import chess
 import chess.svg
+import chess.syzygy
 from stockfish import Stockfish
 import math
+
+
 
 def getPieceValueHeuristic(piece, i):
     if piece == None:
@@ -171,13 +174,49 @@ def minimax(depth, board, alpha, beta, isMaximizing):
             if (beta <= alpha):
                 return bestMove
         return bestMove
+    
+def endgame(board, possibleMoves):
+        
+    with chess.syzygy.open_tablebase("syzygyTables") as tablebase:
+        valuePos = -1
+        positiveMove = None
+        valueNeg = 1
+        negativeMove = None
+        zeroMove = None
+        move = None
+        for m in possibleMoves:
+            move = chess.Move.from_uci(str(m))
+            board.push(move)
+            value = tablebase.probe_dtz(board)
+            board.pop()
+            if value == 0:
+                zeroMove = move
+
+            elif value > 0:
+               if value > valuePos:
+                    positiveMove = move
+                    valuePos = value
+            else:
+                if value > valueNeg:
+                    negativeMove = move
+                    valueNeg = move
+
+    if negativeMove:
+        return negativeMove
+    elif zeroMove:
+        return zeroMove
+    else:
+        return positiveMove                
 
 def minimaxRoot(board, isMaximizing):
     possibleMoves = board.legal_moves
 
     pieceDict = board.piece_map()
+    
+    if (len(pieceDict) <= 5):
+        return endgame(board, possibleMoves)
+    # depth = 3
     depth = int(15 / math.log(len(pieceDict), 2))
-    # depth = int((3 * math.log(20))/(math.log(possibleMoves.count())))
     print("depth: ", depth)
     bestMove = float('-inf')
     bestMoveFinal = None
@@ -198,8 +237,11 @@ def minimaxRoot(board, isMaximizing):
     return bestMoveFinal
 
 def main():
-    stockfish = Stockfish(depth=3, parameters={"Skill Level": 1})
+    stockfish = Stockfish(depth=1, parameters={"Skill Level": 1})
     board = chess.Board()
+    # with chess.syzygy.open_tablebase("syzygyTables") as tablebase:
+    #     board = chess.Board("8/2K5/4B3/3N4/8/8/4k3/8 b - - 0 1")
+    #     print(tablebase.probe_dtz(board))
     n = 0
     print(board)
     while n < 1000:
