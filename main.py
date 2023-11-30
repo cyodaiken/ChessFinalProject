@@ -1,10 +1,9 @@
 import chess
 import chess.svg
+import chess.polyglot
 import chess.syzygy
 from stockfish import Stockfish
 import math
-
-
 
 def getPieceValueHeuristic(piece, i):
     if piece == None:
@@ -80,7 +79,6 @@ def getPieceValueHeuristic(piece, i):
     
     return value 
     
-
 def evaluationHeuristic(board):
     i = 0
     evaluation = 0
@@ -102,8 +100,6 @@ def evaluationHeuristic(board):
         else:
             evaluation = 0
     return evaluation
-
-
 
 def getPieceValue(piece):
     if piece == None:
@@ -146,7 +142,8 @@ def evaluation(board):
 
     return evaluation
 
-def minimax(depth, board, alpha, beta, isMaximizing):
+def minimax(depth, board, alpha, beta, isMaximizing, M):
+    
     if (depth == 0):
         return evaluationHeuristic(board) 
     
@@ -155,24 +152,55 @@ def minimax(depth, board, alpha, beta, isMaximizing):
     if (isMaximizing):
         bestMove = float("-inf")
         for m in possibleMoves:
-            move = chess.Move.from_uci(str(m))
+            move = chess.Move.from_uci(str(m))  
+            newDepth = depth
+            # if (board.is_capture(move)):
+            #     newDepth = depth + 1
+            
             board.push(move)
-            bestMove = max(bestMove, minimax(depth - 1, board, alpha, beta, not isMaximizing))
-            board.pop()
+
+            if (board.fen() in M):
+                result = board.fen()
+                board.pop()
+                return M.get(result)
+            
+            bestMove = max(bestMove, minimax(newDepth - 1, board, alpha, beta, not isMaximizing, M))
+
             alpha = max(alpha, bestMove)
+
+            M[board.fen()] = bestMove
+            board.pop()
+
             if beta <= alpha:
                 return bestMove
+            
         return bestMove
     else:
         bestMove = float("inf")
         for m in possibleMoves:
             move = chess.Move.from_uci(str(m))
+            newDepth = depth
+            if (board.is_capture(move)):
+                newDepth = depth + 2
+
             board.push(move)
-            bestMove = min(bestMove, minimax(depth - 1, board, alpha, beta, not isMaximizing))
-            board.pop()
+
+            if (board.fen() in M):
+                result = board.fen()
+                board.pop()
+                return M.get(result)
+            
+            bestMove = min(bestMove, minimax(newDepth - 1, board, alpha, beta, not isMaximizing, M))
+
             beta = min(beta, bestMove)
+
+            M[board.fen()] = bestMove
+            
+            board.pop()
+
             if (beta <= alpha):
                 return bestMove
+            
         return bestMove
     
 def endgame(board, possibleMoves):
@@ -209,41 +237,63 @@ def endgame(board, possibleMoves):
         return positiveMove                
 
 def minimaxRoot(board, isMaximizing):
+
+    M = {}
+    
     possibleMoves = board.legal_moves
 
     pieceDict = board.piece_map()
+
+    with chess.polyglot.open_reader("polyglotBook/Book.bin") as reader:   
+        try:
+           print("move: ", reader.weighted_choice(board).move)
+           return reader.weighted_choice(board).move
+        except IndexError:
+            pass
     
     if (len(pieceDict) <= 5):
         return endgame(board, possibleMoves)
-    # depth = 3
-    depth = int(15 / math.log(len(pieceDict), 2))
-    print("depth: ", depth)
+    
+    depth = 2
+    # depth = int(15 / math.log(len(pieceDict), 2))
+    # print("depth: ", depth)
+
     bestMove = float('-inf')
     bestMoveFinal = None
     
     for m in possibleMoves:
+        
         move = chess.Move.from_uci(str(m))
+        
+        newDepth = depth
+        if (board.is_capture(move)):
+            newDepth += 2
+
         board.push(move)
-        value = minimax(depth - 1, board, -float("inf"), float("inf"), not isMaximizing)
-        # print("value: ", value)
-        # unmake the last move 
-        board.pop()
+
+        if (board.fen() in M):
+            return M.get(board.fen())
+        
+        value = minimax(newDepth - 1, board, -float("inf"), float("inf"), not isMaximizing, M)
+        
+
         if (value >= bestMove):
-            # print("Best score: ", str(bestMove))
-            # print("Best move: ", str(bestMoveFinal))
             bestMove = value
             bestMoveFinal = move
 
+        M[board.fen()] = bestMove
+
+        # unmake the last move 
+        board.pop()
     return bestMoveFinal
 
 def main():
-    stockfish = Stockfish(depth=1, parameters={"Skill Level": 1})
+    stockfish = Stockfish(depth=1, parameters={"UCI_LimitStrength": True, "UCI_Elo": 100})
+    stockfish.set_elo_rating(100)
     board = chess.Board()
-    # with chess.syzygy.open_tablebase("syzygyTables") as tablebase:
-    #     board = chess.Board("8/2K5/4B3/3N4/8/8/4k3/8 b - - 0 1")
-    #     print(tablebase.probe_dtz(board))
     n = 0
     print(board)
+
     while n < 1000:
 
         if board.is_game_over():
@@ -254,9 +304,6 @@ def main():
             # Alpha-Beta Pruning
             print("White's Turn: ")
             move = minimaxRoot(board, True)
-            # if move == None:
-            #     print("Game Over")
-            #     return 
             move = chess.Move.from_uci(str(move))
             board.push(move)
             stockfish.make_moves_from_current_position([move])
@@ -264,16 +311,13 @@ def main():
             # Stockfish 
             print("Black's Turn: ")
             move = stockfish.get_best_move()
-            # moves = list(board.generate_legal_moves())
-            # if move == None:
-            #     return "Game Over"
             move = chess.Move.from_uci(str(move))
             board.push(move)
             stockfish.make_moves_from_current_position([move])
         print(board)
         chess.svg.board(board)
         n += 1
-    print("100 move limit exceeded")
+    print("1000 move limit exceeded")
     return 
 
 if __name__ == "__main__":
