@@ -3,7 +3,9 @@ import chess.svg
 import chess.polyglot
 import chess.syzygy
 from stockfish import Stockfish
-import math
+import randomMoveGen
+
+from pprint import pprint
 
 def getPieceValueHeuristic(piece, i):
     if piece == None:
@@ -86,17 +88,19 @@ def evaluationHeuristic(board):
     
     while i < 63:
         try:
-            x = bool(board.piece_at(i).color)
+            # !!
+            x = not bool(board.piece_at(i).color)
         except AttributeError as e:
             x = x
         evaluation = evaluation + (getPieceValueHeuristic(str(board.piece_at(i)), 63 - i) if x else -getPieceValueHeuristic(str(board.piece_at(i)), i))
         i += 1
 
+    # !!
     if board.is_game_over():
         if board.outcome().winner == chess.WHITE:
-            evaluation += 1000000
-        elif board.outcome().winner == chess.BLACK:
             evaluation -= 1000000
+        elif board.outcome().winner == chess.BLACK:
+            evaluation += 1000000
         else:
             evaluation = 0
     return evaluation
@@ -126,17 +130,19 @@ def evaluation(board):
     
     while i < 63:
         try:
-            x = bool(board.piece_at(i).color)
+            ## !!
+            x = not bool(board.piece_at(i).color)
         except AttributeError as e:
             x = x
         evaluation = evaluation + (getPieceValue(str(board.piece_at(i))) if x else -getPieceValue(str(board.piece_at(i))))
         i += 1
 
     if board.is_game_over():
+        ## !!
         if board.outcome().winner == chess.WHITE:
-            evaluation += 10000
-        elif board.outcome().winner == chess.BLACK:
             evaluation -= 10000
+        elif board.outcome().winner == chess.BLACK:
+            evaluation += 10000
         else:
             evaluation = 0
 
@@ -145,7 +151,8 @@ def evaluation(board):
 def minimax(depth, board, alpha, beta, isMaximizing, M):
     
     if (depth == 0):
-        return evaluationHeuristic(board) 
+        return evaluationHeuristic(board)
+        # return evaluationHeuristic(board) 
     
     possibleMoves = board.legal_moves
 
@@ -180,8 +187,8 @@ def minimax(depth, board, alpha, beta, isMaximizing, M):
         for m in possibleMoves:
             move = chess.Move.from_uci(str(m))
             newDepth = depth
-            if (board.is_capture(move)):
-                newDepth = depth + 2
+            # if (board.is_capture(move)):
+            #     newDepth = depth + 2
 
             board.push(move)
 
@@ -246,7 +253,7 @@ def minimaxRoot(board, isMaximizing):
 
     with chess.polyglot.open_reader("polyglotBook/Book.bin") as reader:   
         try:
-           print("move: ", reader.weighted_choice(board).move)
+        #    print("move: ", reader.weighted_choice(board).move)
            return reader.weighted_choice(board).move
         except IndexError:
             pass
@@ -254,7 +261,7 @@ def minimaxRoot(board, isMaximizing):
     if (len(pieceDict) <= 5):
         return endgame(board, possibleMoves)
     
-    depth = 2
+    depth = 4
     # depth = int(15 / math.log(len(pieceDict), 2))
     # print("depth: ", depth)
 
@@ -266,8 +273,8 @@ def minimaxRoot(board, isMaximizing):
         move = chess.Move.from_uci(str(m))
         
         newDepth = depth
-        if (board.is_capture(move)):
-            newDepth += 2
+        # if (board.is_capture(move)):
+        #     newDepth += 2
 
         board.push(move)
 
@@ -276,7 +283,6 @@ def minimaxRoot(board, isMaximizing):
         
         value = minimax(newDepth - 1, board, -float("inf"), float("inf"), not isMaximizing, M)
         
-
         if (value >= bestMove):
             bestMove = value
             bestMoveFinal = move
@@ -287,38 +293,74 @@ def minimaxRoot(board, isMaximizing):
         board.pop()
     return bestMoveFinal
 
-def main():
+
+def start():
     stockfish = Stockfish(depth=1, parameters={"UCI_LimitStrength": True, "UCI_Elo": 100})
     stockfish.set_elo_rating(100)
+
     board = chess.Board()
     n = 0
-    print(board)
+    # print(board)
+
+    stockfishMoves = []
+    myMoves = []
 
     while n < 1000:
 
         if board.is_game_over():
-            print(board.outcome())
-            return 
+            #print(board.outcome())
+            #print("Moves:", n)
 
-        if n % 2 == 0:
+            # print(' '.join(map(str, stockfishMoves)))
+
+            print(stockfishMoves)
+
+            # pprint("stockMoves: ", stockfishMoves)
+
+            # print()
+            print("myMoves: ", myMoves)
+            return board.outcome(), n
+
+        # !!
+        if n % 2 == 1:
             # Alpha-Beta Pruning
-            print("White's Turn: ")
+            # print("White's Turn: ")
             move = minimaxRoot(board, True)
+            myMoves.append(str(move))
             move = chess.Move.from_uci(str(move))
             board.push(move)
+            
+            temp = []
+            for m in stockfish.get_top_moves(5):
+
+                temp.append(m.get('Move'))
+                
+            stockfishMoves.append(temp)
+
             stockfish.make_moves_from_current_position([move])
         else:
             # Stockfish 
-            print("Black's Turn: ")
+            # print("Black's Turn: ")
+            # randomMoveGen.getRandMove(board)
             move = stockfish.get_best_move()
             move = chess.Move.from_uci(str(move))
             board.push(move)
             stockfish.make_moves_from_current_position([move])
-        print(board)
+        # print(board)
         chess.svg.board(board)
         n += 1
-    print("1000 move limit exceeded")
+    # print("1000 move limit exceeded")
     return 
+
+
+def main():
+
+    for i in range(0, 20):
+        print(start())
+
+
+
+
 
 if __name__ == "__main__":
     main() 
